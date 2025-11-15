@@ -1,255 +1,248 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
-import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
-import { ImageUpload } from "../ImageUpload";
-import { ArrowLeft, Plus, X } from "lucide-react";
-import { mockOpportunities } from "./OpportunityDashboardPage";
+import { Textarea } from "../ui/textarea";
+import { ImageWithFallback } from "../figma/ImageWithFallback";
+import {
+  getOpportunity,
+  updateOpportunity,
+} from "../../services/api";
+import { Upload } from "lucide-react";
 
-type EditOpportunityPageProps = {
-  opportunityId: number;
-  onNavigate: (page: string, opportunityId?: number) => void;
+type OpportunityEditPageProps = {
+  opportunityId: string;
+  onNavigate: (page: string, id?: string) => void;
 };
 
-export function EditOpportunityPage({ opportunityId, onNavigate }: EditOpportunityPageProps) {
+export function OpportunityEditPage({
+  opportunityId,
+  onNavigate,
+}: OpportunityEditPageProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [date, setDate] = useState("");
-  const [duration, setDuration] = useState("");
   const [location, setLocation] = useState("");
-  const [skillInput, setSkillInput] = useState("");
+  const [duration, setDuration] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
-  const [imageUrl, setImageUrl] = useState("");
+  const [date, setDate] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
-  // Load existing opportunity data
+  const [currentImage, setCurrentImage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const availableSkills = [
+    "Recycling",
+    "Sorting",
+    "Teamwork",
+    "Community Support",
+    "Awareness",
+    "Logistics",
+    "Data Entry",
+  ];
+
   useEffect(() => {
-    const opportunity = mockOpportunities.find(opp => opp.id === opportunityId);
-    if (opportunity) {
-      setTitle(opportunity.title);
-      setDescription(opportunity.description);
-      setDate(opportunity.date);
-      setDuration(opportunity.duration);
-      setLocation(opportunity.location);
-      setSkills(opportunity.requiredSkills);
-      setImageUrl(opportunity.image);
-    }
+    loadOpportunity();
   }, [opportunityId]);
 
-  const handleAddSkill = () => {
-    if (skillInput.trim() && !skills.includes(skillInput.trim())) {
-      setSkills([...skills, skillInput.trim()]);
-      setSkillInput("");
+  async function loadOpportunity() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const opp = await getOpportunity(opportunityId);
+
+      // Pre-fill all fields
+      setTitle(opp.title);
+      setDescription(opp.description);
+      setLocation(opp.location);
+      setDuration(opp.duration);
+      setDate(opp.date ? opp.date.split("T")[0] : "");
+      setSkills(opp.requiredSkills || []);
+      setCurrentImage(opp.imageUrl ? `http://localhost:5000${opp.imageUrl}` : "");
+    } catch (err: any) {
+      setError(err.message);
     }
-  };
 
-  const handleRemoveSkill = (skillToRemove: string) => {
-    setSkills(skills.filter(skill => skill !== skillToRemove));
-  };
+    setLoading(false);
+  }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddSkill();
+  function toggleSkill(skill: string) {
+    setSkills((prev) =>
+      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
+    );
+  }
+
+  async function handleUpdate() {
+    setSaving(true);
+    setError("");
+
+    try {
+      const fd = new FormData();
+
+      fd.append("title", title);
+      fd.append("description", description);
+      fd.append("location", location);
+      fd.append("date", date);
+      fd.append("duration", duration);
+      fd.append("requiredSkills", JSON.stringify(skills));
+
+      if (imageFile) fd.append("opportunityImage", imageFile);
+
+      await updateOpportunity(opportunityId, fd);
+
+      alert("Opportunity updated successfully!");
+      onNavigate("opportunity-detail", opportunityId);
+    } catch (err: any) {
+      setError(err.message);
     }
-  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real app, this would submit to an API
-    console.log('Updating opportunity:', {
-      id: opportunityId,
-      title,
-      description,
-      date,
-      duration,
-      location,
-      requiredSkills: skills,
-      image: imageUrl
-    });
-    // Navigate back to opportunity detail page
-    onNavigate('opportunity-detail', opportunityId);
-  };
+    setSaving(false);
+  }
+
+  if (loading) return <div className="p-8">Loading...</div>;
+  if (error) return <div className="p-8 text-red-500">{error}</div>;
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        {/* Back Button */}
-        <button
-          onClick={() => onNavigate('opportunity-detail', opportunityId)}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Opportunity</span>
-        </button>
-
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="mb-2">Edit Posted Opportunity</h1>
-          <p className="text-muted-foreground">
-            Update the details of your volunteer opportunity
-          </p>
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="mb-2">Edit Opportunity</h1>
+            <p className="text-muted-foreground">
+              Update the details of this volunteering opportunity
+            </p>
+          </div>
+
+          <Button variant="outline" onClick={() => onNavigate("opportunity-detail", opportunityId)}>
+            Back
+          </Button>
         </div>
 
-        {/* Form Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Opportunity Details</CardTitle>
-            <CardDescription>
-              Make changes to the opportunity information
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Image Upload */}
-              <div className="space-y-2">
-                <Label>Opportunity Image</Label>
-                <ImageUpload
-                  value={imageUrl}
-                  onChange={setImageUrl}
-                  onRemove={() => setImageUrl("")}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Upload a new image to replace the current one, or keep the existing image
-                </p>
-              </div>
+        {/* Error */}
+        {error && <p className="text-red-500 mb-4">{error}</p>}
 
-              {/* Title */}
-              <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  placeholder="e.g., Beach Cleanup Drive"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  className="bg-input-background"
-                />
-              </div>
+        <div className="bg-card rounded-xl shadow p-6 space-y-6">
+          {/* Title */}
+          <div>
+            <Label>Title</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
 
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="description">Description *</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Provide a detailed description of the opportunity, what volunteers will do, and the impact they'll make..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  required
-                  rows={5}
-                  className="bg-input-background resize-none"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {description.length} characters
-                </p>
-              </div>
+          {/* Description */}
+          <div>
+            <Label>Description</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+            />
+          </div>
 
-              {/* Date and Duration */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="date">Date *</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    required
-                    className="bg-input-background"
-                  />
-                </div>
+          {/* Location */}
+          <div>
+            <Label>Location</Label>
+            <Input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+          </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="duration">Duration *</Label>
-                  <Input
-                    id="duration"
-                    placeholder="e.g., 3 hours per session"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    required
-                    className="bg-input-background"
-                  />
-                </div>
-              </div>
+          {/* Date */}
+          <div>
+            <Label>Date</Label>
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
 
-              {/* Location */}
-              <div className="space-y-2">
-                <Label htmlFor="location">Location *</Label>
-                <Input
-                  id="location"
-                  placeholder="e.g., Coastal Beach Park, Downtown Area"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  required
-                  className="bg-input-background"
-                />
-              </div>
+          {/* Duration */}
+          <div>
+            <Label>Duration</Label>
+            <Input
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+            />
+          </div>
 
-              {/* Required Skills */}
-              <div className="space-y-2">
-                <Label htmlFor="skills">Required Skills</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="skills"
-                    placeholder="Type a skill and press Enter or click Add"
-                    value={skillInput}
-                    onChange={(e) => setSkillInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    className="bg-input-background"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAddSkill}
-                    disabled={!skillInput.trim()}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </div>
-
-                {/* Skills Tags */}
-                {skills.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3 p-3 bg-muted/50 rounded-lg">
-                    {skills.map((skill, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-1 rounded-full"
-                      >
-                        <span className="text-sm">{skill}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSkill(skill)}
-                          className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                <Button
-                  type="submit"
-                  className="bg-primary hover:bg-primary/90 flex-1"
-                >
-                  Save Changes
-                </Button>
-                <Button
+          {/* Required Skills */}
+          <div>
+            <Label>Required Skills</Label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+              {availableSkills.map((skill) => (
+                <button
                   type="button"
-                  variant="outline"
-                  onClick={() => onNavigate('opportunity-detail', opportunityId)}
-                  className="flex-1"
+                  key={skill}
+                  onClick={() => toggleSkill(skill)}
+                  className={`px-3 py-2 rounded border text-sm ${
+                    skills.includes(skill)
+                      ? "bg-primary text-white"
+                      : "bg-muted text-muted-foreground"
+                  }`}
                 >
-                  Cancel
-                </Button>
+                  {skill}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <Label>Opportunity Image</Label>
+
+            {currentImage && (
+              <div className="mt-3">
+                <ImageWithFallback
+                  src={currentImage}
+                  className="w-48 h-32 rounded object-cover"
+                />
               </div>
-            </form>
-          </CardContent>
-        </Card>
+            )}
+
+            <div className="mt-3 flex items-center gap-4">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setImageFile(e.target.files ? e.target.files[0] : null)
+                }
+              />
+
+              {imageFile && (
+                <ImageWithFallback
+                  src={URL.createObjectURL(imageFile)}
+                  className="w-20 h-20 rounded object-cover"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-4">
+            <Button
+              className="w-full"
+              disabled={saving}
+              onClick={handleUpdate}
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => onNavigate("opportunity-detail", opportunityId)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

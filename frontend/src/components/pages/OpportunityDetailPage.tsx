@@ -1,273 +1,210 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
-import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
+import { Card, CardContent } from "../ui/card";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Edit, Trash2, UserPlus } from "lucide-react";
-import { mockOpportunities, Opportunity } from "./OpportunityDashboardPage";
+import {
+  Calendar,
+  MapPin,
+  Clock,
+  Users,
+  Leaf,
+  Trash2,
+  Edit,
+} from "lucide-react";
+
+import {
+  getOpportunity,
+  joinOpportunity,
+  deleteOpportunity,
+} from "../../services/api";
 
 type OpportunityDetailPageProps = {
-  opportunityId: number;
-  userRole: 'volunteer' | 'ngo';
-  onNavigate: (page: string, opportunityId?: number) => void;
+  opportunityId: string;
+  userRole: "volunteer" | "ngo";
+  onNavigate: (page: string) => void;
 };
 
-export function OpportunityDetailPage({ opportunityId, userRole, onNavigate }: OpportunityDetailPageProps) {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isJoined, setIsJoined] = useState(false);
+export function OpportunityDetailPage({
+  opportunityId,
+  userRole,
+  onNavigate,
+}: OpportunityDetailPageProps) {
+  const [opportunity, setOpportunity] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Find the opportunity from mock data
-  const opportunity = mockOpportunities.find(opp => opp.id === opportunityId);
+  useEffect(() => {
+    loadOpportunity();
+  }, [opportunityId]);
 
-  if (!opportunity) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="mb-2">Opportunity Not Found</h2>
-          <p className="text-muted-foreground mb-4">
-            The opportunity you're looking for doesn't exist or has been removed.
-          </p>
-          <Button onClick={() => onNavigate('opportunities')}>
-            Back to Opportunities
-          </Button>
-        </div>
-      </div>
-    );
+  async function loadOpportunity() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await getOpportunity(opportunityId);
+      setOpportunity(data);
+    } catch (err: any) {
+      setError(err.message);
+    }
+
+    setLoading(false);
   }
 
-  // Simulating if this NGO created the opportunity
-  // In a real app, you'd check if user.id === opportunity.createdBy
-  const isCreator = userRole === 'ngo';
+  async function handleJoin() {
+    try {
+      await joinOpportunity(opportunityId);
+      alert("You joined this opportunity!");
+      loadOpportunity();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  }
 
-  const handleDelete = () => {
-    // In a real app, this would call an API to delete
-    console.log('Deleting opportunity:', opportunityId);
-    setShowDeleteDialog(false);
-    onNavigate('opportunities');
-  };
+  async function handleDelete() {
+    if (!confirm("Are you sure you want to delete this opportunity?")) return;
 
-  const handleJoin = () => {
-    // In a real app, this would call an API to join
-    console.log('Joining opportunity:', opportunityId);
-    setIsJoined(true);
-  };
+    try {
+      await deleteOpportunity(opportunityId);
+      alert("Deleted successfully");
+      onNavigate("dashboard");
+    } catch (err: any) {
+      alert(err.message);
+    }
+  }
+
+  if (loading) return <div className="p-8">Loading…</div>;
+  if (error) return <div className="p-8 text-red-500">{error}</div>;
+  if (!opportunity) return <div className="p-8">Opportunity not found.</div>;
 
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        {/* Back Button */}
-        <button
-          onClick={() => onNavigate('opportunities')}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+        <Button
+          variant="outline"
+          className="mb-6"
+          onClick={() => onNavigate("dashboard")}
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Opportunities</span>
-        </button>
+          ← Back
+        </Button>
 
-        {/* Main Content */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Hero Image */}
-            <div className="aspect-[16/9] overflow-hidden rounded-xl">
-              <ImageWithFallback
-                src={opportunity.image}
-                alt={opportunity.title}
-                className="w-full h-full object-cover"
-              />
+        <Card className="overflow-hidden">
+          {/* Image Section */}
+          <div className="aspect-[4/2] overflow-hidden">
+            <ImageWithFallback
+              src={
+                opportunity.imageUrl
+                  ? `http://localhost:5000${opportunity.imageUrl}`
+                  : "https://placehold.co/1200x600"
+              }
+              alt={opportunity.title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+
+          <CardContent className="p-6 space-y-6">
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <h1 className="text-3xl mb-2">{opportunity.title}</h1>
+
+              <Badge
+                variant="default"
+                className={
+                  opportunity.status === "open"
+                    ? "bg-primary"
+                    : "bg-secondary text-secondary-foreground"
+                }
+              >
+                {opportunity.status || "open"}
+              </Badge>
             </div>
 
-            {/* Title and Status */}
-            <div>
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                <h1 className="flex-1">{opportunity.title}</h1>
-                <Badge 
-                  variant={opportunity.status === 'Open' ? 'default' : 'secondary'}
-                  className={`${opportunity.status === 'Open' ? 'bg-primary' : ''} text-sm px-4 py-1`}
-                >
-                  {opportunity.status}
-                </Badge>
+            {/* Description */}
+            <p className="text-muted-foreground text-lg">
+              {opportunity.description}
+            </p>
+
+            {/* Info Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Calendar className="w-5 h-5 text-primary" />
+                <span>{opportunity.date || "Not set"}</span>
               </div>
 
-              {/* Description */}
-              <div className="prose max-w-none">
-                <h3>About This Opportunity</h3>
-                <p className="text-muted-foreground whitespace-pre-line">
-                  {opportunity.description}
-                </p>
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Clock className="w-5 h-5 text-accent" />
+                <span>{opportunity.duration || "--"}</span>
+              </div>
+
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <MapPin className="w-5 h-5 text-secondary" />
+                <span>{opportunity.location || "Unknown"}</span>
+              </div>
+
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Users className="w-5 h-5 text-primary" />
+                <span>
+                  {opportunity.volunteers?.length || 0} volunteers joined
+                </span>
               </div>
             </div>
 
             {/* Required Skills */}
-            {opportunity.requiredSkills.length > 0 && (
-              <Card>
-                <CardContent className="pt-6">
-                  <h3 className="mb-3">Required Skills</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {opportunity.requiredSkills.map((skill, index) => (
-                      <div
-                        key={index}
-                        className="bg-primary/10 text-primary px-4 py-2 rounded-full"
-                      >
-                        {skill}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+            {opportunity.requiredSkills?.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Required Skills</h3>
+                <div className="flex flex-wrap gap-2">
+                  {opportunity.requiredSkills.map((skill: string, i: number) => (
+                    <Badge key={i} variant="secondary">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
             )}
 
-            {/* Action Buttons - Mobile */}
-            <div className="lg:hidden space-y-3">
-              {userRole === 'volunteer' ? (
+            {/* Buttons */}
+            <div className="flex gap-4 mt-6">
+              {/* Volunteer Action */}
+              {userRole === "volunteer" && (
                 <Button
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+                  className="w-full"
+                  disabled={opportunity.status !== "open"}
                   onClick={handleJoin}
-                  disabled={isJoined || opportunity.status !== 'Open'}
                 >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  {isJoined ? 'Joined' : 'Join Opportunity'}
+                  Join Opportunity
                 </Button>
-              ) : isCreator ? (
+              )}
+
+              {/* NGO Actions */}
+              {userRole === "ngo" && (
                 <>
                   <Button
-                    className="w-full"
-                    onClick={() => onNavigate('edit-opportunity', opportunityId)}
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() =>
+                      onNavigate("edit-opportunity", opportunity._id)
+                    }
                   >
                     <Edit className="w-4 h-4 mr-2" />
-                    Edit Opportunity
+                    Edit
                   </Button>
+
                   <Button
                     variant="destructive"
-                    className="w-full"
-                    onClick={() => setShowDeleteDialog(true)}
+                    className="flex-1"
+                    onClick={handleDelete}
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Opportunity
+                    Delete
                   </Button>
                 </>
-              ) : null}
+              )}
             </div>
-          </div>
-
-          {/* Right Column - Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Opportunity Details Card */}
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="mb-4">Opportunity Details</h3>
-                
-                <div className="space-y-4">
-                  {/* Date */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Date</p>
-                      <p>{opportunity.date}</p>
-                    </div>
-                  </div>
-
-                  {/* Duration */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Clock className="w-5 h-5 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Duration</p>
-                      <p>{opportunity.duration}</p>
-                    </div>
-                  </div>
-
-                  {/* Location */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-secondary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-5 h-5 text-secondary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Location</p>
-                      <p>{opportunity.location}</p>
-                    </div>
-                  </div>
-
-                  {/* Volunteers */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Users className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Volunteers</p>
-                      <p>{opportunity.volunteersJoined} joined</p>
-                    </div>
-                  </div>
-
-                  {/* Posted By */}
-                  <div className="pt-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-1">Posted by</p>
-                    <p className="text-primary">{opportunity.postedBy}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons - Desktop */}
-            <div className="hidden lg:block space-y-3">
-              {userRole === 'volunteer' ? (
-                <Button
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
-                  onClick={handleJoin}
-                  disabled={isJoined || opportunity.status !== 'Open'}
-                >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  {isJoined ? 'Joined' : 'Join Opportunity'}
-                </Button>
-              ) : isCreator ? (
-                <>
-                  <Button
-                    className="w-full"
-                    onClick={() => onNavigate('edit-opportunity', opportunityId)}
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Opportunity
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    className="w-full"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Opportunity
-                  </Button>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the opportunity "{opportunity.title}" 
-              and remove all associated data from our servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

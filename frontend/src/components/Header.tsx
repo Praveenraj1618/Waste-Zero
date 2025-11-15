@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Menu, X, User, LogOut, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { NotificationDropdown } from "./NotificationDropdown";
+import { NotificationBell } from "./NotificationBell";
 import { useTheme } from "./ThemeProvider";
 
 type HeaderProps = {

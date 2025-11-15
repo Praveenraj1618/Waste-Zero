@@ -6,12 +6,12 @@ dotenv.config();
 module.exports = async function connectDB() {
   try {
     await mongoose.connect(process.env.MONGO_URI, {
-      useUnifiedTopology: true,
       useNewUrlParser: true,
+      useUnifiedTopology: true
     });
-    console.log("MongoDB Connected");
+    console.log('MongoDB connected');
   } catch (err) {
-    console.error("DB Connection Error:", err.message);
+    console.error('MongoDB connection error:', err.message);
     process.exit(1);
   }
 };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell, CheckCircle2, MessageSquare, Calendar, Package } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -9,74 +9,24 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 
+import { listNotifications, markNotificationRead } from "../services/api";
+import socket from "../services/socket";
+
 type Notification = {
-  id: number;
-  type: 'match' | 'message' | 'pickup' | 'opportunity';
-  title: string;
+  _id: string;
+  type: 'match' | 'message' | 'pickup' | 'application';
   message: string;
-  timestamp: string;
+  sent_at: string;
   read: boolean;
-  linkTo?: string;
 };
 
-const mockNotifications: Notification[] = [
-  {
-    id: 1,
-    type: 'match',
-    title: 'New Match Found',
-    message: 'Beach Cleanup Drive matches your skills',
-    timestamp: '5 min ago',
-    read: false,
-    linkTo: 'opportunities',
-  },
-  {
-    id: 2,
-    type: 'message',
-    title: 'New Message',
-    message: 'Sarah Johnson sent you a message',
-    timestamp: '10 min ago',
-    read: false,
-    linkTo: 'messages',
-  },
-  {
-    id: 3,
-    type: 'pickup',
-    title: 'Pickup Confirmed',
-    message: 'Your pickup is scheduled for tomorrow',
-    timestamp: '1 hour ago',
-    read: false,
-    linkTo: 'schedule-pickup',
-  },
-  {
-    id: 4,
-    type: 'opportunity',
-    title: 'Opportunity Update',
-    message: 'E-Waste Collection Event has been updated',
-    timestamp: '2 hours ago',
-    read: true,
-    linkTo: 'opportunities',
-  },
-  {
-    id: 5,
-    type: 'message',
-    title: 'New Message',
-    message: 'Green Earth NGO sent you a message',
-    timestamp: '3 hours ago',
-    read: true,
-    linkTo: 'messages',
-  },
-];
-
-type NotificationDropdownProps = {
-  onNavigate?: (page: string) => void;
-};
-
-export function NotificationDropdown({ onNavigate }: NotificationDropdownProps) {
-  const [notifications, setNotifications] = useState(mockNotifications);
+export function NotificationDropdown({ onNavigate }: { onNavigate?: (p: string)=>void }) {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const getIcon = (type: string) => {
+  function getIcon(type: string) {
     switch (type) {
       case 'match':
         return <CheckCircle2 className="w-4 h-4 text-green-500" />;
@@ -84,38 +34,54 @@ export function NotificationDropdown({ onNavigate }: NotificationDropdownProps) 
         return <MessageSquare className="w-4 h-4 text-blue-500" />;
       case 'pickup':
         return <Calendar className="w-4 h-4 text-orange-500" />;
-      case 'opportunity':
+      case 'application':
         return <Package className="w-4 h-4 text-purple-500" />;
       default:
         return <Bell className="w-4 h-4" />;
     }
-  };
+  }
 
-  const handleOpenChange = (open: boolean) => {
-    setIsOpen(open);
-  };
-
-  const handleNotificationClick = (notification: Notification) => {
-    // Mark as read
-    setNotifications(notifications.map(n =>
-      n.id === notification.id ? { ...n, read: true } : n
-    ));
-    
-    // Navigate to the appropriate page
-    if (notification.linkTo && onNavigate) {
-      onNavigate(notification.linkTo);
+  async function loadNotifications() {
+    try {
+      const data = await listNotifications();
+      setNotifications(data);
+    } catch (e) {
+      console.error("Failed to load notifications");
     }
-    
-    // Close dropdown
-    setIsOpen(false);
-  };
+  }
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
-  };
+  useEffect(() => {
+    loadNotifications();
+
+    // Real-time: receive notification
+    socket.on("notification", (notif: Notification) => {
+      setNotifications(prev => [notif, ...prev]);
+    });
+
+    return () => socket.off("notification");
+  }, []);
+
+  async function handleNotificationClick(n: Notification) {
+    if (!n.read) await markNotificationRead(n._id);
+    loadNotifications();
+
+    // navigate (optional)
+    if (n.type === "message" && onNavigate) onNavigate("messages");
+    if (n.type === "pickup" && onNavigate) onNavigate("pickup-dashboard");
+    if (n.type === "match" && onNavigate) onNavigate("opportunities");
+
+    setIsOpen(false);
+  }
+
+  async function markAllAsRead() {
+    await Promise.all(
+      notifications.map(n => !n.read && markNotificationRead(n._id))
+    );
+    loadNotifications();
+  }
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-5 h-5" />
@@ -126,46 +92,47 @@ export function NotificationDropdown({ onNavigate }: NotificationDropdownProps) 
           )}
         </Button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent align="end" className="w-80 p-0" sideOffset={8}>
         <div className="p-4 border-b bg-card">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Notifications</h3>
+
             {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={(e) => {
-                e.stopPropagation();
-                markAllAsRead();
-              }}>
+              <Button variant="ghost" size="sm" onClick={markAllAsRead}>
                 Mark all read
               </Button>
             )}
           </div>
         </div>
+
         {notifications.length > 0 ? (
           <>
             <ScrollArea className="h-[400px]">
               <div className="divide-y">
-                {notifications.map((notification) => (
+                {notifications.map((n) => (
                   <button
-                    key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
+                    key={n._id}
+                    onClick={() => handleNotificationClick(n)}
                     className={`w-full p-4 text-left hover:bg-muted/50 transition-colors ${
-                      !notification.read ? 'bg-primary/5' : ''
+                      !n.read ? "bg-primary/5" : ""
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5">{getIcon(notification.type)}</div>
+                      <div className="mt-0.5">{getIcon(n.type)}</div>
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm">{notification.title}</p>
-                          {!notification.read && (
-                            <div className="w-2 h-2 bg-primary rounded-full" />
-                          )}
+                          <p className="text-sm capitalize">{n.type}</p>
+                          {!n.read && <div className="w-2 h-2 bg-primary rounded-full" />}
                         </div>
+
                         <p className="text-sm text-muted-foreground mb-1">
-                          {notification.message}
+                          {n.message}
                         </p>
+
                         <p className="text-xs text-muted-foreground">
-                          {notification.timestamp}
+                          {new Date(n.sent_at).toLocaleString()}
                         </p>
                       </div>
                     </div>
@@ -173,14 +140,9 @@ export function NotificationDropdown({ onNavigate }: NotificationDropdownProps) 
                 ))}
               </div>
             </ScrollArea>
+
             <div className="p-2 border-t bg-card">
-              <Button 
-                variant="ghost" 
-                className="w-full justify-center"
-                onClick={() => {
-                  setIsOpen(false);
-                }}
-              >
+              <Button variant="ghost" className="w-full justify-center" onClick={() => setIsOpen(false)}>
                 Close
               </Button>
             </div>

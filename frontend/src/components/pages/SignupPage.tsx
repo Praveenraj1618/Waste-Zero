@@ -1,82 +1,73 @@
 import { useState } from "react";
+import { signup } from "../../services/api";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Leaf } from "lucide-react";
+import { Checkbox } from "../ui/checkbox";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
-import { Leaf, User, Building2 } from "lucide-react";
 
 type SignupPageProps = {
-  onSignup: (name: string, email: string, password: string, role: 'volunteer' | 'ngo') => void;
   onNavigate: (page: string) => void;
 };
 
-export function SignupPage({ onSignup, onNavigate }: SignupPageProps) {
+export function SignupPage({ onNavigate }: SignupPageProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<'volunteer' | 'ngo'>('volunteer');
+  const [role, setRole] = useState("volunteer");
+  const [bio, setBio] = useState("");
+  const [location, setLocation] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (password !== confirmPassword) {
-      alert("Passwords don't match!");
-      return;
+  const availableSkills = [
+    "Recycling",
+    "Sorting",
+    "Pickup Assistance",
+    "Management",
+    "Awareness Campaigns",
+  ];
+
+  const toggleSkill = (skill: string) => {
+    setSkills((prev) =>
+      prev.includes(skill)
+        ? prev.filter((s) => s !== skill)
+        : [...prev, skill]
+    );
+  };
+
+  const handleSignup = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const payload = {
+        name,
+        email,
+        password,
+        role,
+        bio,
+        location,
+        skills,
+      };
+
+      await signup(payload);
+
+      alert("Signup successful! Please login now.");
+
+      onNavigate("login");
+    } catch (err: any) {
+      setError(err.message);
     }
-    
-    onSignup(name, email, password, role);
+
+    setLoading(false);
   };
 
   return (
     <div className="min-h-screen grid md:grid-cols-2">
-      {/* Left Side - Image */}
-      <div className="hidden md:block relative bg-gradient-to-br from-secondary to-primary">
-        <div className="absolute inset-0">
-          <ImageWithFallback 
-            src="https://images.unsplash.com/photo-1627072586323-aafafbf84c4a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjbGVhbiUyMGVhcnRoJTIwZW52aXJvbm1lbnR8ZW58MXx8fHwxNzYwNDU5MjkwfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-            alt="Clean earth environment"
-            className="w-full h-full object-cover opacity-20"
-          />
-        </div>
-        
-        <div className="relative z-10 h-full flex items-center justify-center p-12">
-          <div className="text-white text-center max-w-lg">
-            <h2 className="text-4xl mb-6">
-              Start Your Green Journey Today
-            </h2>
-            <p className="text-lg text-white/90 mb-8">
-              Join our growing community of volunteers and organizations dedicated 
-              to creating a waste-free, sustainable world.
-            </p>
-            
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-              <h3 className="text-xl mb-4">Why Join WasteZero?</h3>
-              <ul className="text-left space-y-3 text-white/90">
-                <li className="flex items-start gap-2">
-                  <span className="text-accent">✓</span>
-                  <span>Schedule waste pickups effortlessly</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-accent">✓</span>
-                  <span>Track your environmental impact</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-accent">✓</span>
-                  <span>Connect with like-minded eco-warriors</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-accent">✓</span>
-                  <span>Make a real difference in your community</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Side - Form */}
+      {/* Left Side - Form */}
       <div className="flex items-center justify-center p-6 md:p-12 bg-background">
         <div className="w-full max-w-md">
           <div className="mb-8">
@@ -84,117 +75,140 @@ export function SignupPage({ onSignup, onNavigate }: SignupPageProps) {
               <div className="relative w-10 h-10">
                 <div className="absolute inset-0 bg-primary rounded-lg rotate-45"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Leaf className="w-6 h-6 text-white z-10" fill="currentColor" />
+                  <Leaf
+                    className="w-6 h-6 text-white z-10"
+                    fill="currentColor"
+                  />
                 </div>
               </div>
               <span className="text-xl font-bold text-primary">WasteZero</span>
             </div>
-            
+
             <h1 className="text-3xl mb-2">Create Account</h1>
             <p className="text-muted-foreground">
-              Join the movement for a cleaner, greener planet
+              Join our mission towards a greener future
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-6">
+            {error && <p className="text-red-500">{error}</p>}
+
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label>Name</Label>
               <Input
-                id="name"
-                type="text"
-                placeholder="John Doe"
+                placeholder="Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                required
-                className="bg-input-background"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label>Email</Label>
               <Input
-                id="email"
                 type="email"
-                placeholder="your.email@example.com"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
-                className="bg-input-background"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label>Password</Label>
               <Input
-                id="password"
                 type="password"
-                placeholder="Create a strong password"
+                placeholder="********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-input-background"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label>Role</Label>
+              <select
+                className="border p-2 rounded w-full"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+              >
+                <option value="volunteer">Volunteer</option>
+                <option value="ngo">NGO</option>
+                <option value="pickup_agent">Pickup Agent</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Location</Label>
               <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="bg-input-background"
+                placeholder="City or Area"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
               />
             </div>
 
-            <div className="space-y-3">
-              <Label>I am a...</Label>
-              <RadioGroup value={role} onValueChange={(value) => setRole(value as 'volunteer' | 'ngo')}>
-                <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-                  <RadioGroupItem value="volunteer" id="volunteer" />
-                  <Label htmlFor="volunteer" className="flex items-center gap-3 cursor-pointer flex-1">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <User className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <div className="font-medium">Volunteer</div>
-                      <div className="text-sm text-muted-foreground">Individual looking to help</div>
-                    </div>
-                  </Label>
-                </div>
-                
-                <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-                  <RadioGroupItem value="ngo" id="ngo" />
-                  <Label htmlFor="ngo" className="flex items-center gap-3 cursor-pointer flex-1">
-                    <div className="w-10 h-10 bg-secondary/10 rounded-full flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-secondary" />
-                    </div>
-                    <div>
-                      <div className="font-medium">NGO Representative</div>
-                      <div className="text-sm text-muted-foreground">Organization managing pickups</div>
-                    </div>
-                  </Label>
-                </div>
-              </RadioGroup>
+            <div className="space-y-2">
+              <Label>Bio</Label>
+              <Input
+                placeholder="Tell us about yourself"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+              />
             </div>
 
-            <Button type="submit" className="w-full" size="lg">
-              Create Account
+            <div className="space-y-2">
+              <Label>Skills</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {availableSkills.map((skill) => (
+                  <div key={skill} className="flex items-center space-x-2">
+                    <Checkbox
+                      checked={skills.includes(skill)}
+                      onCheckedChange={() => toggleSkill(skill)}
+                    />
+                    <span className="text-sm">{skill}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              onClick={handleSignup}
+              className="w-full"
+              size="lg"
+              disabled={loading}
+            >
+              {loading ? "Creating Account..." : "Sign Up"}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
               <button
-                type="button"
-                onClick={() => onNavigate('login')}
                 className="text-primary hover:underline"
+                onClick={() => onNavigate("login")}
               >
-                Log In
+                Login
               </button>
             </p>
-          </form>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Image */}
+      <div className="hidden md:block relative bg-gradient-to-br from-primary to-secondary">
+        <div className="absolute inset-0">
+          <ImageWithFallback
+            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c"
+            alt="Signup background"
+            className="w-full h-full object-cover opacity-20"
+          />
+        </div>
+
+        <div className="relative z-10 h-full flex items-center justify-center p-12">
+          <div className="text-white text-center max-w-lg">
+            <h2 className="text-4xl mb-6">
+              Join the Movement for a Sustainable Future
+            </h2>
+            <p className="text-lg text-white/90">
+              Become a part of WasteZero and turn awareness into real action.
+            </p>
+          </div>
         </div>
       </div>
     </div>
