@@ -1,4 +1,4 @@
-# WasteZero - Group Praveen
+# WasteZero 
 
 This branch contains the complete implementation of the WasteZero project, including Backend and Frontend modules.
 
