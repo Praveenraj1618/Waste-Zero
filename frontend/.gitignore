@@ -1,0 +1,51 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+out/
+
+# Local env files
+.env
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor junk
+.vscode/
+.idea/
+
+# Cache
+.cache/
+.next/cache/
+vite.cache/
+coverage/
+
+# Static export cache (Next.js)
+export/
+
+# TypeScript
+*.tsbuildinfo
+
+# Storybook (if added later)
+.storybook-out/
+storybook-static/
+
+# Temp
+tmp/
+temp/
+
+# Lock files — optional, keep only the one you use
+yarn.lock
+pnpm-lock.yaml
